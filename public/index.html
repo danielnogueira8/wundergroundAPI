@@ -627,6 +627,141 @@
       font-size: 0.85rem;
       white-space: nowrap;
     }
+
+    /* Time Distribution Section */
+    .time-distribution-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .section-subtitle {
+      color: var(--text-secondary);
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+
+    .distribution-charts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 2rem;
+    }
+
+    .distribution-chart {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .chart-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    .chart-summary {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+
+    .summary-badge {
+      background: var(--bg-card);
+      padding: 0.4rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .summary-badge.hot {
+      background: rgba(255, 107, 53, 0.15);
+      border-color: rgba(255, 107, 53, 0.3);
+      color: var(--orange);
+    }
+
+    .summary-badge.cold {
+      background: rgba(99, 179, 237, 0.15);
+      border-color: rgba(99, 179, 237, 0.3);
+      color: var(--blue);
+    }
+
+    .time-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .time-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      opacity: 0.4;
+      transition: opacity 0.2s;
+    }
+
+    .time-bar-row.has-data {
+      opacity: 1;
+    }
+
+    .time-label {
+      min-width: 55px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-align: right;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .time-bar-container {
+      flex: 1;
+      height: 24px;
+      background: var(--bg-card);
+      border-radius: 4px;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .time-bar {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.4s ease;
+      min-width: 2px;
+    }
+
+    .bar-hot {
+      background: linear-gradient(90deg, var(--orange), #ff8a50);
+    }
+
+    .bar-cold {
+      background: linear-gradient(90deg, var(--blue), #90cdf4);
+    }
+
+    .bar-count {
+      position: absolute;
+      right: 8px;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .time-bar-row.has-data:hover {
+      transform: translateX(2px);
+    }
+
+    .time-bar-row.has-data:hover .time-bar {
+      filter: brightness(1.1);
+    }
+
+    @media (max-width: 900px) {
+      .distribution-charts {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
@@ -799,6 +934,31 @@
               <div class="insight-text">${insight}</div>
             </div>
           `).join('')}
+        </section>
+
+        <section class="time-distribution-section">
+          <h2 class="section-title">🕐 When Do Temperature Extremes Occur?</h2>
+          <p class="section-subtitle">Distribution of daily high and low temperature times across the analyzed period</p>
+          
+          <div class="distribution-charts">
+            <div class="distribution-chart">
+              <h3 class="chart-title">☀️ Peak Temperature Times</h3>
+              <div class="chart-summary">
+                <span class="summary-badge hot">Median: ${patterns.hottest_time_of_day.median_time}</span>
+                <span class="summary-badge">Most likely: ${patterns.hottest_time_of_day.most_common_time}</span>
+              </div>
+              ${renderTimeDistribution(patterns.hottest_time_of_day.hourly_distribution, 'hot')}
+            </div>
+            
+            <div class="distribution-chart">
+              <h3 class="chart-title">🌙 Lowest Temperature Times</h3>
+              <div class="chart-summary">
+                <span class="summary-badge cold">Median: ${patterns.coldest_time_of_day.median_time}</span>
+                <span class="summary-badge">Most likely: ${patterns.coldest_time_of_day.most_common_time}</span>
+              </div>
+              ${renderTimeDistribution(patterns.coldest_time_of_day.hourly_distribution, 'cold')}
+            </div>
+          </div>
         </section>
 
         <div class="patterns-grid">
@@ -977,6 +1137,28 @@
       if (!distribution || distribution.length === 0) return 'N/A';
       const mostCommon = distribution.reduce((max, item) => item.count > max.count ? item : max);
       return `${mostCommon.temperature}°C (${mostCommon.count} days)`;
+    }
+
+    function renderTimeDistribution(distribution, type) {
+      if (!distribution || distribution.length === 0) {
+        return '<div class="no-data">No distribution data available</div>';
+      }
+      
+      const barClass = type === 'hot' ? 'bar-hot' : 'bar-cold';
+      
+      return `
+        <div class="time-bars">
+          ${distribution.map(item => `
+            <div class="time-bar-row ${item.count > 0 ? 'has-data' : ''}">
+              <div class="time-label">${item.label}</div>
+              <div class="time-bar-container">
+                <div class="time-bar ${barClass}" style="width: ${item.bar_width}%"></div>
+                ${item.count > 0 ? `<span class="bar-count">${item.count} day${item.count > 1 ? 's' : ''} (${item.percentage}%)</span>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
     }
   </script>
 </body>

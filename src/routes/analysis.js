@@ -364,6 +364,7 @@ function analyzeTemperatureData(observations, dailySummaries, location, days) {
         most_common_time: mostCommonPeakTime ? mostCommonPeakTime[0] : null,
         frequency: mostCommonPeakTime ? mostCommonPeakTime[1] : 0,
         all_peak_times: peakTimes,
+        hourly_distribution: calculateHourlyDistribution(peakTimes, days),
         // Keep average for reference
         average_hottest_hour: hottestHourByAvg?.hour,
         average_temp_at_hottest: hottestHourByAvg?.average
@@ -373,6 +374,7 @@ function analyzeTemperatureData(observations, dailySummaries, location, days) {
         most_common_time: mostCommonTroughTime ? mostCommonTroughTime[0] : null,
         frequency: mostCommonTroughTime ? mostCommonTroughTime[1] : 0,
         all_trough_times: troughTimes,
+        hourly_distribution: calculateHourlyDistribution(troughTimes, days),
         // Keep average for reference
         average_coldest_hour: coldestHourByAvg?.hour,
         average_temp_at_coldest: coldestHourByAvg?.average
@@ -450,6 +452,50 @@ function calculateTemperatureDistribution(temps) {
       is_median: parseInt(temp) === Math.round(median)
     }))
     .sort((a, b) => a.temperature - b.temperature);
+  
+  return distribution;
+}
+
+/**
+ * Calculate hourly distribution of times
+ * Groups times into hourly buckets and calculates percentage
+ */
+function calculateHourlyDistribution(times, totalDays) {
+  if (!times || times.length === 0) return [];
+  
+  // Initialize all 24 hours
+  const hourCounts = {};
+  for (let h = 0; h < 24; h++) {
+    hourCounts[h] = 0;
+  }
+  
+  // Count occurrences in each hour
+  times.forEach(timeStr => {
+    const mins = timeToMinutes(timeStr);
+    const hour = Math.floor(mins / 60);
+    if (hour >= 0 && hour < 24) {
+      hourCounts[hour]++;
+    }
+  });
+  
+  // Convert to array with formatted labels
+  const maxCount = Math.max(...Object.values(hourCounts));
+  const distribution = [];
+  
+  for (let h = 0; h < 24; h++) {
+    const count = hourCounts[h];
+    if (count > 0 || (h >= 6 && h <= 20)) { // Always show 6 AM to 8 PM
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const hour12 = h % 12 || 12;
+      distribution.push({
+        hour: h,
+        label: `${hour12} ${ampm}`,
+        count: count,
+        percentage: totalDays > 0 ? Math.round((count / totalDays) * 100) : 0,
+        bar_width: maxCount > 0 ? Math.round((count / maxCount) * 100) : 0
+      });
+    }
+  }
   
   return distribution;
 }
