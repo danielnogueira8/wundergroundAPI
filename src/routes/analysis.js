@@ -90,12 +90,56 @@ router.get('/temperature', async (req, res, next) => {
           }));
           allObservations.push(...observations);
           
-          // Store daily summary
+          // Find the time when max and min occurred
+          const maxTemp = dayData.daily?.temperature?.max;
+          const minTemp = dayData.daily?.temperature?.min;
+          
+          // Find best time for max (prefer afternoon 10AM-6PM)
+          let maxTime = null;
+          if (maxTemp !== null && maxTemp !== undefined) {
+            const maxObs = dayData.hourly_data.filter(o => o.temperature_c === maxTemp);
+            const afternoonMax = maxObs.filter(o => {
+              const mins = timeToMinutes(o.time);
+              return mins >= 600 && mins <= 1080;
+            });
+            if (afternoonMax.length > 0) {
+              maxTime = afternoonMax.reduce((best, o) => 
+                Math.abs(timeToMinutes(o.time) - 840) < Math.abs(timeToMinutes(best.time) - 840) ? o : best
+              ).time;
+            } else if (maxObs.length > 0) {
+              maxTime = maxObs.reduce((best, o) => 
+                Math.abs(timeToMinutes(o.time) - 840) < Math.abs(timeToMinutes(best.time) - 840) ? o : best
+              ).time;
+            }
+          }
+          
+          // Find best time for min (prefer night/early morning)
+          let minTime = null;
+          if (minTemp !== null && minTemp !== undefined) {
+            const minObs = dayData.hourly_data.filter(o => o.temperature_c === minTemp);
+            const nightMin = minObs.filter(o => {
+              const mins = timeToMinutes(o.time);
+              return mins >= 1320 || mins <= 480;
+            });
+            if (nightMin.length > 0) {
+              minTime = nightMin.reduce((best, o) => 
+                Math.abs(timeToMinutes(o.time) - 300) < Math.abs(timeToMinutes(best.time) - 300) ? o : best
+              ).time;
+            } else if (minObs.length > 0) {
+              minTime = minObs.reduce((best, o) => 
+                Math.abs(timeToMinutes(o.time) - 300) < Math.abs(timeToMinutes(best.time) - 300) ? o : best
+              ).time;
+            }
+          }
+          
+          // Store daily summary with times
           dailySummaries.push({
             date: dateStr,
-            min: dayData.daily?.temperature?.min,
-            max: dayData.daily?.temperature?.max,
-            average: dayData.daily?.temperature?.average
+            min: minTemp,
+            max: maxTemp,
+            average: dayData.daily?.temperature?.average,
+            max_time: maxTime,
+            min_time: minTime
           });
         }
         
@@ -347,7 +391,9 @@ function analyzeTemperatureData(observations, dailySummaries, location, days) {
     daily_breakdown: dailySummaries.map(d => ({
       date: d.date,
       min: d.min,
+      min_time: d.min_time,
       max: d.max,
+      max_time: d.max_time,
       average: d.average
     })),
     // Frequency distribution of daily max temperatures

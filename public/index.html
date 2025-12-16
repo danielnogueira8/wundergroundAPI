@@ -621,6 +621,12 @@
       width: 40%;
       min-width: 150px;
     }
+
+    .time-cell {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -864,7 +870,9 @@
                 <th>Date</th>
                 <th>Day</th>
                 <th>High (°C)</th>
+                <th>Time</th>
                 <th>Low (°C)</th>
+                <th>Time</th>
                 <th>Average (°C)</th>
                 <th>Range</th>
               </tr>
@@ -932,7 +940,9 @@
             <td class="date-cell">${dateFormatted}</td>
             <td>${dayName}</td>
             <td class="temp-high">${day.max}°C ${isMedian ? '← Median' : ''}</td>
+            <td class="time-cell">${day.max_time || '-'}</td>
             <td class="temp-low">${day.min}°C</td>
+            <td class="time-cell">${day.min_time || '-'}</td>
             <td class="temp-avg">${day.average}°C</td>
             <td>${range}°C</td>
           </tr>
