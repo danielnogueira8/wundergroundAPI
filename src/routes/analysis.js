@@ -161,7 +161,6 @@ function analyzeTemperatureData(observations, dailySummaries, location, days) {
     .map(d => d.max);
   
   // Find when highest temperatures occur (by hour)
-  const hourlyMaxCounts = {};
   const hourlyTemps = {};
   
   validObs.forEach(obs => {
@@ -179,9 +178,59 @@ function analyzeTemperatureData(observations, dailySummaries, location, days) {
     count: temps.length
   })).sort((a, b) => b.average - a.average);
   
-  // Find the hottest time of day
-  const hottestHour = hourlyAverages[0];
-  const coldestHour = hourlyAverages[hourlyAverages.length - 1];
+  // Find the hottest time of day (by average)
+  const hottestHourByAvg = hourlyAverages[0];
+  const coldestHourByAvg = hourlyAverages[hourlyAverages.length - 1];
+  
+  // Find MEDIAN time when peak temperature occurs each day
+  // Group observations by date to find peak time per day
+  const obsByDate = {};
+  validObs.forEach(obs => {
+    if (!obsByDate[obs.date]) {
+      obsByDate[obs.date] = [];
+    }
+    obsByDate[obs.date].push(obs);
+  });
+  
+  // For each day, find the time(s) when the highest temperature occurred
+  const peakTimes = [];
+  const troughTimes = [];
+  
+  Object.entries(obsByDate).forEach(([date, dayObs]) => {
+    const maxTemp = Math.max(...dayObs.map(o => o.temperature_c));
+    const minTemp = Math.min(...dayObs.map(o => o.temperature_c));
+    
+    // Find the time(s) at max temp - take the first occurrence
+    const peakObs = dayObs.find(o => o.temperature_c === maxTemp);
+    if (peakObs) {
+      peakTimes.push(peakObs.time);
+    }
+    
+    // Find the time(s) at min temp - take the first occurrence
+    const troughObs = dayObs.find(o => o.temperature_c === minTemp);
+    if (troughObs) {
+      troughTimes.push(troughObs.time);
+    }
+  });
+  
+  // Calculate median peak time
+  const medianPeakTime = calculateMedianTime(peakTimes);
+  const medianTroughTime = calculateMedianTime(troughTimes);
+  
+  // Count frequency of peak times
+  const peakTimeFrequency = {};
+  peakTimes.forEach(t => {
+    peakTimeFrequency[t] = (peakTimeFrequency[t] || 0) + 1;
+  });
+  const mostCommonPeakTime = Object.entries(peakTimeFrequency)
+    .sort((a, b) => b[1] - a[1])[0];
+  
+  const troughTimeFrequency = {};
+  troughTimes.forEach(t => {
+    troughTimeFrequency[t] = (troughTimeFrequency[t] || 0) + 1;
+  });
+  const mostCommonTroughTime = Object.entries(troughTimeFrequency)
+    .sort((a, b) => b[1] - a[1])[0];
   
   // Calculate statistics
   const stats = {
@@ -219,21 +268,29 @@ function analyzeTemperatureData(observations, dailySummaries, location, days) {
     },
     patterns: {
       hottest_time_of_day: {
-        time: hottestHour?.hour,
-        average_temp: hottestHour?.average,
-        observation_count: hottestHour?.count
+        median_time: medianPeakTime,
+        most_common_time: mostCommonPeakTime ? mostCommonPeakTime[0] : null,
+        frequency: mostCommonPeakTime ? mostCommonPeakTime[1] : 0,
+        all_peak_times: peakTimes,
+        // Keep average for reference
+        average_hottest_hour: hottestHourByAvg?.hour,
+        average_temp_at_hottest: hottestHourByAvg?.average
       },
       coldest_time_of_day: {
-        time: coldestHour?.hour,
-        average_temp: coldestHour?.average,
-        observation_count: coldestHour?.count
+        median_time: medianTroughTime,
+        most_common_time: mostCommonTroughTime ? mostCommonTroughTime[0] : null,
+        frequency: mostCommonTroughTime ? mostCommonTroughTime[1] : 0,
+        all_trough_times: troughTimes,
+        // Keep average for reference
+        average_coldest_hour: coldestHourByAvg?.hour,
+        average_temp_at_coldest: coldestHourByAvg?.average
       },
-      // Top 5 hottest hours
+      // Top 5 hottest hours (by average temp)
       warmest_hours: hourlyAverages.slice(0, 5).map(h => ({
         time: h.hour,
         avg_temp: h.average
       })),
-      // Top 5 coldest hours
+      // Top 5 coldest hours (by average temp)
       coldest_hours: hourlyAverages.slice(-5).reverse().map(h => ({
         time: h.hour,
         avg_temp: h.average
@@ -245,7 +302,7 @@ function analyzeTemperatureData(observations, dailySummaries, location, days) {
       max: d.max,
       average: d.average
     })),
-    insights: generateInsights(allTemps, dailyMaxTemps, hourlyAverages, days)
+    insights: generateInsights(allTemps, dailyMaxTemps, hourlyAverages, days, medianPeakTime, medianTroughTime)
   };
   
   return stats;
@@ -262,15 +319,73 @@ function calculateMedian(arr) {
 }
 
 /**
+ * Convert time string to minutes from midnight
+ * e.g., "2:30 PM" -> 870 (14:30 = 14*60 + 30)
+ */
+function timeToMinutes(timeStr) {
+  if (!timeStr) return 0;
+  const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return 0;
+  
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3].toUpperCase();
+  
+  // Convert to 24-hour format
+  if (period === 'PM' && hours !== 12) {
+    hours += 12;
+  } else if (period === 'AM' && hours === 12) {
+    hours = 0;
+  }
+  
+  return hours * 60 + minutes;
+}
+
+/**
+ * Convert minutes from midnight back to time string
+ * e.g., 870 -> "2:30 PM"
+ */
+function minutesToTime(minutes) {
+  let hours = Math.floor(minutes / 60);
+  const mins = Math.round(minutes % 60);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  
+  if (hours > 12) hours -= 12;
+  if (hours === 0) hours = 12;
+  
+  return `${hours}:${mins.toString().padStart(2, '0')} ${period}`;
+}
+
+/**
+ * Calculate median time from an array of time strings
+ */
+function calculateMedianTime(times) {
+  if (times.length === 0) return null;
+  
+  // Convert all times to minutes
+  const minutesArray = times.map(timeToMinutes);
+  
+  // Sort and find median
+  const sorted = [...minutesArray].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  
+  let medianMinutes;
+  if (sorted.length % 2 !== 0) {
+    medianMinutes = sorted[mid];
+  } else {
+    medianMinutes = (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  
+  return minutesToTime(medianMinutes);
+}
+
+/**
  * Generate human-readable insights
  */
-function generateInsights(allTemps, dailyMaxTemps, hourlyAverages, days) {
+function generateInsights(allTemps, dailyMaxTemps, hourlyAverages, days, medianPeakTime, medianTroughTime) {
   const insights = [];
   
-  const avgTemp = allTemps.reduce((a, b) => a + b, 0) / allTemps.length;
   const medianHigh = calculateMedian(dailyMaxTemps);
-  const hottestHour = hourlyAverages[0];
-  const coldestHour = hourlyAverages[hourlyAverages.length - 1];
   
   // Temperature range insight
   const range = Math.max(...allTemps) - Math.min(...allTemps);
@@ -281,14 +396,14 @@ function generateInsights(allTemps, dailyMaxTemps, hourlyAverages, days) {
     insights.push(`The median daily high was ${medianHigh}°C`);
   }
   
-  // Best time for warmth
-  if (hottestHour) {
-    insights.push(`The warmest time of day is typically around ${hottestHour.hour} (avg ${hottestHour.average}°C)`);
+  // Median peak time insight
+  if (medianPeakTime) {
+    insights.push(`Peak daily temperature typically occurs around ${medianPeakTime} (median)`);
   }
   
-  // Coldest time
-  if (coldestHour) {
-    insights.push(`The coldest time is typically around ${coldestHour.hour} (avg ${coldestHour.average}°C)`);
+  // Median trough time insight
+  if (medianTroughTime) {
+    insights.push(`Lowest daily temperature typically occurs around ${medianTroughTime} (median)`);
   }
   
   // Temperature trend (comparing first half to second half of period)

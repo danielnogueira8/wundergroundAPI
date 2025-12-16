@@ -507,6 +507,99 @@
       border-color: var(--accent);
       color: var(--text-primary);
     }
+
+    /* Data Table */
+    .table-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      overflow-x: auto;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+    }
+
+    .data-table thead {
+      background: var(--bg-secondary);
+    }
+
+    .data-table th {
+      padding: 1rem;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-secondary);
+      border-bottom: 2px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 0.875rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+
+    .data-table tbody tr:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .data-table .temp-high {
+      color: #f59e0b;
+      font-weight: 600;
+    }
+
+    .data-table .temp-low {
+      color: #3b82f6;
+    }
+
+    .data-table .temp-avg {
+      color: var(--text-secondary);
+    }
+
+    .data-table .date-cell {
+      font-weight: 500;
+    }
+
+    .median-row {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%) !important;
+      font-weight: 700;
+    }
+
+    .median-row td {
+      border-top: 2px solid var(--accent);
+      border-bottom: 2px solid var(--accent);
+      color: var(--accent);
+    }
+
+    .table-summary {
+      display: flex;
+      gap: 2rem;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .summary-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .summary-label {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+
+    .summary-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
   </style>
 </head>
 <body>
@@ -650,15 +743,15 @@
           </div>
           
           <div class="stat-card highlight">
-            <div class="stat-label">☀️ Hottest Time of Day</div>
-            <div class="stat-value">${patterns.hottest_time_of_day.time}</div>
-            <div class="stat-detail">Avg: ${patterns.hottest_time_of_day.average_temp}°C</div>
+            <div class="stat-label">☀️ Peak Temperature Time (Median)</div>
+            <div class="stat-value">${patterns.hottest_time_of_day.median_time}</div>
+            <div class="stat-detail">Most common: ${patterns.hottest_time_of_day.most_common_time} (${patterns.hottest_time_of_day.frequency}/${period.days_with_data} days)</div>
           </div>
           
           <div class="stat-card">
-            <div class="stat-label">🌙 Coldest Time of Day</div>
-            <div class="stat-value">${patterns.coldest_time_of_day.time}</div>
-            <div class="stat-detail">Avg: ${patterns.coldest_time_of_day.average_temp}°C</div>
+            <div class="stat-label">🌙 Coldest Time of Day (Median)</div>
+            <div class="stat-value">${patterns.coldest_time_of_day.median_time}</div>
+            <div class="stat-detail">Most common: ${patterns.coldest_time_of_day.most_common_time} (${patterns.coldest_time_of_day.frequency}/${period.days_with_data} days)</div>
           </div>
         </div>
 
@@ -704,6 +797,43 @@
             ${renderChart(daily_breakdown)}
           </div>
         </section>
+
+        <section class="table-section">
+          <h2 class="section-title">📋 Daily Temperature Records</h2>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Day</th>
+                <th>High (°C)</th>
+                <th>Low (°C)</th>
+                <th>Average (°C)</th>
+                <th>Range</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${renderDailyTable(daily_breakdown, temperature.daily_highs.median)}
+            </tbody>
+          </table>
+          <div class="table-summary">
+            <div class="summary-item">
+              <span class="summary-label">Median High:</span>
+              <span class="summary-value temp-high">${temperature.daily_highs.median}°C</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Average High:</span>
+              <span class="summary-value">${temperature.daily_highs.average}°C</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Highest:</span>
+              <span class="summary-value temp-high">${temperature.daily_highs.max}°C</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Lowest High:</span>
+              <span class="summary-value temp-low">${temperature.daily_highs.min}°C</span>
+            </div>
+          </div>
+        </section>
       `;
     }
 
@@ -725,6 +855,29 @@
               Avg: ${day.average}°C
             </div>
           </div>
+        `;
+      }).join('');
+    }
+
+    function renderDailyTable(dailyData, medianHigh) {
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      
+      return dailyData.map(day => {
+        const dateObj = new Date(day.date);
+        const dayName = days[dateObj.getDay()];
+        const dateFormatted = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const range = day.max - day.min;
+        const isMedian = day.max === medianHigh;
+        
+        return `
+          <tr class="${isMedian ? 'median-row' : ''}">
+            <td class="date-cell">${dateFormatted}</td>
+            <td>${dayName}</td>
+            <td class="temp-high">${day.max}°C ${isMedian ? '← Median' : ''}</td>
+            <td class="temp-low">${day.min}°C</td>
+            <td class="temp-avg">${day.average}°C</td>
+            <td>${range}°C</td>
+          </tr>
         `;
       }).join('');
     }
