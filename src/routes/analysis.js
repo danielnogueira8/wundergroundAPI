@@ -200,16 +200,64 @@ function analyzeTemperatureData(observations, dailySummaries, location, days) {
     const maxTemp = Math.max(...dayObs.map(o => o.temperature_c));
     const minTemp = Math.min(...dayObs.map(o => o.temperature_c));
     
-    // Find the time(s) at max temp - take the first occurrence
-    const peakObs = dayObs.find(o => o.temperature_c === maxTemp);
-    if (peakObs) {
-      peakTimes.push(peakObs.time);
+    // Find ALL times at max temp (there may be multiple readings with same temp)
+    const peakObservations = dayObs.filter(o => o.temperature_c === maxTemp);
+    
+    // Prefer afternoon times (10 AM - 6 PM) for peak temperature - this is when peaks typically occur
+    const afternoonPeaks = peakObservations.filter(o => {
+      const mins = timeToMinutes(o.time);
+      return mins >= 600 && mins <= 1080; // 10:00 AM to 6:00 PM
+    });
+    
+    // Use afternoon peak if available, otherwise use the one closest to 2 PM (840 minutes)
+    let bestPeak;
+    if (afternoonPeaks.length > 0) {
+      // Pick the one closest to 2 PM among afternoon peaks
+      bestPeak = afternoonPeaks.reduce((best, obs) => {
+        const bestDiff = Math.abs(timeToMinutes(best.time) - 840);
+        const obsDiff = Math.abs(timeToMinutes(obs.time) - 840);
+        return obsDiff < bestDiff ? obs : best;
+      });
+    } else if (peakObservations.length > 0) {
+      // Fallback: pick the one closest to 2 PM
+      bestPeak = peakObservations.reduce((best, obs) => {
+        const bestDiff = Math.abs(timeToMinutes(best.time) - 840);
+        const obsDiff = Math.abs(timeToMinutes(obs.time) - 840);
+        return obsDiff < bestDiff ? obs : best;
+      });
     }
     
-    // Find the time(s) at min temp - take the first occurrence
-    const troughObs = dayObs.find(o => o.temperature_c === minTemp);
-    if (troughObs) {
-      troughTimes.push(troughObs.time);
+    if (bestPeak) {
+      peakTimes.push(bestPeak.time);
+    }
+    
+    // Find ALL times at min temp
+    const troughObservations = dayObs.filter(o => o.temperature_c === minTemp);
+    
+    // Prefer night/early morning times (10 PM - 8 AM) for coldest - this is when lows typically occur
+    const nightTroughs = troughObservations.filter(o => {
+      const mins = timeToMinutes(o.time);
+      return mins >= 1320 || mins <= 480; // 10:00 PM to 8:00 AM
+    });
+    
+    // Use night trough if available, otherwise use the one closest to 5 AM (300 minutes)
+    let bestTrough;
+    if (nightTroughs.length > 0) {
+      bestTrough = nightTroughs.reduce((best, obs) => {
+        const bestDiff = Math.abs(timeToMinutes(best.time) - 300);
+        const obsDiff = Math.abs(timeToMinutes(obs.time) - 300);
+        return obsDiff < bestDiff ? obs : best;
+      });
+    } else if (troughObservations.length > 0) {
+      bestTrough = troughObservations.reduce((best, obs) => {
+        const bestDiff = Math.abs(timeToMinutes(best.time) - 300);
+        const obsDiff = Math.abs(timeToMinutes(obs.time) - 300);
+        return obsDiff < bestDiff ? obs : best;
+      });
+    }
+    
+    if (bestTrough) {
+      troughTimes.push(bestTrough.time);
     }
   });
   
