@@ -600,6 +600,27 @@
       font-weight: 600;
       color: var(--text-primary);
     }
+
+    /* Distribution bar */
+    .distribution-bar-container {
+      width: 100%;
+      height: 20px;
+      background: var(--bg-secondary);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .distribution-bar {
+      height: 100%;
+      background: var(--gradient-accent);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+
+    .distribution-table td:last-child {
+      width: 40%;
+      min-width: 150px;
+    }
   </style>
 </head>
 <body>
@@ -808,6 +829,34 @@
         </section>
 
         <section class="table-section">
+          <h2 class="section-title">📊 Daily High Temperature Distribution</h2>
+          <p style="color: var(--text-secondary); margin-bottom: 1rem;">Frequency of each recorded daily maximum temperature</p>
+          <table class="data-table distribution-table">
+            <thead>
+              <tr>
+                <th>Temperature</th>
+                <th>Days Recorded</th>
+                <th>Frequency</th>
+                <th>Distribution</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${renderDistributionTable(data.temperature_distribution, period.days_with_data)}
+            </tbody>
+          </table>
+          <div class="table-summary">
+            <div class="summary-item">
+              <span class="summary-label">Median High:</span>
+              <span class="summary-value temp-high">${temperature.daily_highs.median}°C</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Most Common:</span>
+              <span class="summary-value">${getMostCommonTemp(data.temperature_distribution)}</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="table-section">
           <h2 class="section-title">📋 Daily Temperature Records</h2>
           <table class="data-table">
             <thead>
@@ -889,6 +938,35 @@
           </tr>
         `;
       }).join('');
+    }
+
+    function renderDistributionTable(distribution, totalDays) {
+      if (!distribution || distribution.length === 0) return '<tr><td colspan="4">No data</td></tr>';
+      
+      const maxCount = Math.max(...distribution.map(d => d.count));
+      
+      return distribution.map(item => {
+        const barWidth = (item.count / maxCount) * 100;
+        
+        return `
+          <tr class="${item.is_median ? 'median-row' : ''}">
+            <td class="temp-high">${item.temperature}°C ${item.is_median ? '← Median' : ''}</td>
+            <td>${item.count} ${item.count === 1 ? 'day' : 'days'}</td>
+            <td>${item.percentage}%</td>
+            <td>
+              <div class="distribution-bar-container">
+                <div class="distribution-bar" style="width: ${barWidth}%"></div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function getMostCommonTemp(distribution) {
+      if (!distribution || distribution.length === 0) return 'N/A';
+      const mostCommon = distribution.reduce((max, item) => item.count > max.count ? item : max);
+      return `${mostCommon.temperature}°C (${mostCommon.count} days)`;
     }
   </script>
 </body>

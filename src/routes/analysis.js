@@ -350,6 +350,8 @@ function analyzeTemperatureData(observations, dailySummaries, location, days) {
       max: d.max,
       average: d.average
     })),
+    // Frequency distribution of daily max temperatures
+    temperature_distribution: calculateTemperatureDistribution(dailyMaxTemps),
     insights: generateInsights(allTemps, dailyMaxTemps, hourlyAverages, days, medianPeakTime, medianTroughTime)
   };
   
@@ -364,6 +366,36 @@ function calculateMedian(arr) {
   const sorted = [...arr].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/**
+ * Calculate frequency distribution of temperatures
+ * Returns an array sorted by temperature with count and percentage
+ */
+function calculateTemperatureDistribution(temps) {
+  if (temps.length === 0) return [];
+  
+  // Count frequency of each temperature
+  const frequency = {};
+  temps.forEach(temp => {
+    const rounded = Math.round(temp); // Round to nearest degree
+    frequency[rounded] = (frequency[rounded] || 0) + 1;
+  });
+  
+  // Calculate median
+  const median = calculateMedian(temps);
+  
+  // Convert to array and sort by temperature
+  const distribution = Object.entries(frequency)
+    .map(([temp, count]) => ({
+      temperature: parseInt(temp),
+      count: count,
+      percentage: Math.round((count / temps.length) * 100),
+      is_median: parseInt(temp) === Math.round(median)
+    }))
+    .sort((a, b) => a.temperature - b.temperature);
+  
+  return distribution;
 }
 
 /**
