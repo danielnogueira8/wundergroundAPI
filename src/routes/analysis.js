@@ -360,12 +360,22 @@ function analyzeTemperatureData(observations, dailySummaries, location, days) {
 
 /**
  * Calculate median of an array
+ * For even-length arrays, returns the lower of the two middle values
+ * (more intuitive for weather data where values are typically integers)
  */
 function calculateMedian(arr) {
   if (arr.length === 0) return null;
   const sorted = [...arr].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  
+  if (sorted.length % 2 !== 0) {
+    // Odd number of elements - return the middle one
+    return sorted[mid];
+  } else {
+    // Even number - return the lower middle value (not the average)
+    // This is more intuitive: "at least half the days were this temp or higher"
+    return sorted[mid - 1];
+  }
 }
 
 /**
