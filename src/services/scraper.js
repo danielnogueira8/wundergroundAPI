@@ -606,7 +606,12 @@ class WeatherScraper {
    */
   formatApiResponse(apiData, location, date) {
     const locationParts = location.split('/');
+    const countryCode = locationParts[0] || '';
+    const stationCode = locationParts[2] || '';
     const observations = apiData.observations || [];
+    
+    // Get the timezone for this station/country
+    const timezone = this.getTimezoneForLocation(countryCode, stationCode);
     
     // Extract all temperatures, wind speeds, etc.
     const temps = observations.map(o => o.temp).filter(t => t !== null && t !== undefined);
@@ -623,6 +628,7 @@ class WeatherScraper {
         country: this.getCountryName(locationParts[0] || ''),
         station: locationParts[2] || '',
         station_name: latest.obs_name || '',
+        timezone: timezone,
         raw: location
       },
       date: date,
@@ -671,22 +677,104 @@ class WeatherScraper {
         data_points: observations.length
       },
       hourly_data: observations.map(obs => ({
-        time: this.formatLocalTime(obs.valid_time_gmt),
+        time: this.formatLocalTime(obs.valid_time_gmt, timezone),
         temperature_c: obs.temp
       }))
     };
   }
 
   /**
-   * Format Unix timestamp to local time string
+   * Format Unix timestamp to local time string at the station's timezone
+   * @param {number} unixTimestamp - Unix timestamp in seconds
+   * @param {string} timezone - IANA timezone string (e.g., 'Asia/Seoul')
    */
-  formatLocalTime(unixTimestamp) {
+  formatLocalTime(unixTimestamp, timezone = 'UTC') {
     const date = new Date(unixTimestamp * 1000);
-    const hours = date.getUTCHours();
-    const minutes = date.getUTCMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const hour12 = hours % 12 || 12;
-    return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+    
+    // Use Intl.DateTimeFormat to format in the station's local timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: timezone
+    });
+    
+    return formatter.format(date);
+  }
+
+  /**
+   * Get timezone for a given country/station code
+   */
+  getTimezoneForLocation(countryCode, stationCode) {
+    // Map common airport codes and countries to timezones
+    const stationTimezones = {
+      // Asia
+      'RKSI': 'Asia/Seoul',      // Seoul Incheon
+      'RJTT': 'Asia/Tokyo',      // Tokyo Haneda
+      'RJAA': 'Asia/Tokyo',      // Tokyo Narita
+      'VHHH': 'Asia/Hong_Kong',  // Hong Kong
+      'WSSS': 'Asia/Singapore',  // Singapore Changi
+      'ZBAA': 'Asia/Shanghai',   // Beijing
+      'ZSPD': 'Asia/Shanghai',   // Shanghai Pudong
+      'RPLL': 'Asia/Manila',     // Manila
+      'VTBS': 'Asia/Bangkok',    // Bangkok
+      'VIDP': 'Asia/Kolkata',    // Delhi
+      'VABB': 'Asia/Kolkata',    // Mumbai
+      
+      // Europe
+      'EGLL': 'Europe/London',   // London Heathrow
+      'LFPG': 'Europe/Paris',    // Paris CDG
+      'EDDF': 'Europe/Berlin',   // Frankfurt
+      'EHAM': 'Europe/Amsterdam',// Amsterdam
+      'LEMD': 'Europe/Madrid',   // Madrid
+      'LIRF': 'Europe/Rome',     // Rome
+      
+      // Americas
+      'KJFK': 'America/New_York',    // New York JFK
+      'KLAX': 'America/Los_Angeles', // Los Angeles
+      'KORD': 'America/Chicago',     // Chicago O'Hare
+      'KATL': 'America/New_York',    // Atlanta
+      'CYYZ': 'America/Toronto',     // Toronto
+      'MMMX': 'America/Mexico_City', // Mexico City
+      'SBGR': 'America/Sao_Paulo',   // Sao Paulo
+      
+      // Oceania
+      'YSSY': 'Australia/Sydney',    // Sydney
+      'YMML': 'Australia/Melbourne', // Melbourne
+      'NZAA': 'Pacific/Auckland'     // Auckland
+    };
+    
+    // Check station-specific timezone first
+    if (stationTimezones[stationCode]) {
+      return stationTimezones[stationCode];
+    }
+    
+    // Fallback to country-based timezone
+    const countryTimezones = {
+      'kr': 'Asia/Seoul',
+      'jp': 'Asia/Tokyo',
+      'cn': 'Asia/Shanghai',
+      'hk': 'Asia/Hong_Kong',
+      'sg': 'Asia/Singapore',
+      'th': 'Asia/Bangkok',
+      'in': 'Asia/Kolkata',
+      'ph': 'Asia/Manila',
+      'gb': 'Europe/London',
+      'uk': 'Europe/London',
+      'fr': 'Europe/Paris',
+      'de': 'Europe/Berlin',
+      'es': 'Europe/Madrid',
+      'it': 'Europe/Rome',
+      'nl': 'Europe/Amsterdam',
+      'us': 'America/New_York', // Default to Eastern, though US has multiple
+      'ca': 'America/Toronto',
+      'mx': 'America/Mexico_City',
+      'br': 'America/Sao_Paulo',
+      'au': 'Australia/Sydney',
+      'nz': 'Pacific/Auckland'
+    };
+    
+    return countryTimezones[countryCode.toLowerCase()] || 'UTC';
   }
 
   /**

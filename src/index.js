@@ -4,15 +4,23 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { logger } from './utils/logger.js';
 import weatherRoutes from './routes/weather.js';
+import analysisRoutes from './routes/analysis.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { scraper } from './services/scraper.js';
 import { cache } from './services/cache.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Security middleware
-app.use(helmet());
+// Security middleware (allow inline scripts for frontend)
+app.use(helmet({
+  contentSecurityPolicy: false
+}));
 
 // CORS configuration
 app.use(cors({
@@ -23,6 +31,9 @@ app.use(cors({
 
 // Parse JSON bodies
 app.use(express.json());
+
+// Serve static files (frontend)
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Rate limiting - as per PDR: max 10 requests/minute
 const limiter = rateLimit({
@@ -117,6 +128,9 @@ app.get('/', (req, res) => {
 
 // Weather API routes
 app.use('/api/weather', weatherRoutes);
+
+// Analysis API routes
+app.use('/api/analysis', analysisRoutes);
 
 // 404 handler
 app.use(notFoundHandler);

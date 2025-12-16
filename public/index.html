@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather Analysis Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a24;
+      --bg-card-hover: #22222e;
+      --text-primary: #f0f0f5;
+      --text-secondary: #8888a0;
+      --text-muted: #5a5a70;
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.3);
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --border: #2a2a3a;
+      --gradient-warm: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+      --gradient-cold: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      --gradient-accent: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      padding: 3rem 0;
+      position: relative;
+    }
+
+    header::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 400px;
+      background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      position: relative;
+      z-index: 1;
+      background: var(--gradient-accent);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Search Form */
+    .search-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .search-form {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .form-group {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 0.875rem 1rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-size: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      transition: all 0.2s ease;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    input::placeholder {
+      color: var(--text-muted);
+    }
+
+    button {
+      padding: 0.875rem 2rem;
+      background: var(--gradient-accent);
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px var(--accent-glow);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Results */
+    .results {
+      display: none;
+    }
+
+    .results.visible {
+      display: block;
+      animation: fadeIn 0.4s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .stat-card:hover {
+      background: var(--bg-card-hover);
+      transform: translateY(-4px);
+      border-color: var(--accent);
+    }
+
+    .stat-card.highlight {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+      border-color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .stat-value.warm {
+      background: var(--gradient-warm);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-value.cold {
+      background: var(--gradient-cold);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-unit {
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+    }
+
+    .stat-detail {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    /* Insights */
+    .insights-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .insight-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--bg-secondary);
+      border-radius: 10px;
+      margin-bottom: 0.75rem;
+    }
+
+    .insight-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--gradient-accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .insight-text {
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    /* Time Patterns */
+    .patterns-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .pattern-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+
+    .pattern-title {
+      font-size: 1rem;
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+    }
+
+    .time-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .time-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+    }
+
+    .time-label {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-primary);
+    }
+
+    .time-temp {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+
+    /* Daily Chart */
+    .chart-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      overflow-x: auto;
+    }
+
+    .chart-container {
+      min-width: 600px;
+      height: 200px;
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      padding-top: 2rem;
+      position: relative;
+    }
+
+    .chart-bar {
+      flex: 1;
+      min-width: 20px;
+      background: var(--gradient-accent);
+      border-radius: 4px 4px 0 0;
+      position: relative;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .chart-bar:hover {
+      opacity: 0.8;
+    }
+
+    .chart-bar .tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 10;
+    }
+
+    .chart-bar:hover .tooltip {
+      opacity: 1;
+    }
+
+    /* Location Header */
+    .location-header {
+      text-align: center;
+      margin-bottom: 2rem;
+      padding: 1.5rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+    }
+
+    .location-name {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .location-details {
+      color: var(--text-secondary);
+    }
+
+    .period-badge {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg-secondary);
+      border-radius: 20px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    /* Error State */
+    .error-message {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--error);
+      border-radius: 12px;
+      padding: 1.5rem;
+      color: var(--error);
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+
+      h1 {
+        font-size: 1.75rem;
+      }
+
+      .search-form {
+        flex-direction: column;
+      }
+
+      .form-group {
+        width: 100%;
+      }
+
+      button {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .stat-value {
+        font-size: 2rem;
+      }
+    }
+
+    /* Examples */
+    .examples {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .examples-title {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .example-chips {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .example-chip {
+      padding: 0.5rem 1rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .example-chip:hover {
+      border-color: var(--accent);
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Weather Analysis Dashboard</h1>
+      <p class="subtitle">30-day temperature patterns & insights from Wunderground</p>
+    </header>
+
+    <section class="search-section">
+      <form class="search-form" id="searchForm">
+        <div class="form-group">
+          <label for="location">Location (Station Code)</label>
+          <input 
+            type="text" 
+            id="location" 
+            name="location" 
+            placeholder="kr/incheon/RKSI"
+            required
+          >
+        </div>
+        <div class="form-group" style="max-width: 150px;">
+          <label for="days">Days to Analyze</label>
+          <select id="days" name="days">
+            <option value="7">7 days</option>
+            <option value="14">14 days</option>
+            <option value="30" selected>30 days</option>
+          </select>
+        </div>
+        <button type="submit" id="submitBtn">
+          <span id="btnText">Analyze</span>
+          <div class="spinner" id="spinner" style="display: none;"></div>
+        </button>
+      </form>
+      
+      <div class="examples">
+        <div class="examples-title">Try these examples:</div>
+        <div class="example-chips">
+          <span class="example-chip" data-location="kr/incheon/RKSI">Seoul (RKSI)</span>
+          <span class="example-chip" data-location="us/new-york/KJFK">New York (KJFK)</span>
+          <span class="example-chip" data-location="gb/london/EGLL">London (EGLL)</span>
+          <span class="example-chip" data-location="jp/tokyo/RJTT">Tokyo (RJTT)</span>
+        </div>
+      </div>
+    </section>
+
+    <div id="errorContainer"></div>
+    
+    <div class="results" id="results">
+      <!-- Results will be rendered here -->
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('searchForm');
+    const results = document.getElementById('results');
+    const errorContainer = document.getElementById('errorContainer');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+    const spinner = document.getElementById('spinner');
+    const locationInput = document.getElementById('location');
+    
+    // Example chips
+    document.querySelectorAll('.example-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        locationInput.value = chip.dataset.location;
+        form.dispatchEvent(new Event('submit'));
+      });
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const location = document.getElementById('location').value;
+      const days = document.getElementById('days').value;
+      
+      // Show loading state
+      submitBtn.disabled = true;
+      btnText.textContent = 'Analyzing...';
+      spinner.style.display = 'block';
+      errorContainer.innerHTML = '';
+      results.classList.remove('visible');
+      
+      try {
+        const response = await fetch(`/api/analysis/temperature?location=${encodeURIComponent(location)}&days=${days}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error?.message || 'Analysis failed');
+        }
+        
+        renderResults(data.data);
+        results.classList.add('visible');
+        
+      } catch (error) {
+        errorContainer.innerHTML = `
+          <div class="error-message">
+            <strong>Error:</strong> ${error.message}
+          </div>
+        `;
+      } finally {
+        submitBtn.disabled = false;
+        btnText.textContent = 'Analyze';
+        spinner.style.display = 'none';
+      }
+    });
+
+    function renderResults(data) {
+      const { location, period, temperature, patterns, insights, daily_breakdown } = data;
+      
+      results.innerHTML = `
+        <div class="location-header">
+          <div class="location-name">${location.city}, ${location.country}</div>
+          <div class="location-details">Station: ${location.station}</div>
+          <div class="period-badge">
+            ${period.start_date} → ${period.end_date} (${period.days_with_data} days of data)
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card highlight">
+            <div class="stat-label">📊 Median Daily High</div>
+            <div class="stat-value warm">${temperature.daily_highs.median}<span class="stat-unit">°C</span></div>
+            <div class="stat-detail">Range: ${temperature.daily_highs.min}°C to ${temperature.daily_highs.max}°C</div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-label">🌡️ Overall Average</div>
+            <div class="stat-value">${temperature.overall_average}<span class="stat-unit">°C</span></div>
+            <div class="stat-detail">${period.total_observations} observations</div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-label">🔥 Absolute Maximum</div>
+            <div class="stat-value warm">${temperature.absolute_max}<span class="stat-unit">°C</span></div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-label">❄️ Absolute Minimum</div>
+            <div class="stat-value cold">${temperature.absolute_min}<span class="stat-unit">°C</span></div>
+          </div>
+          
+          <div class="stat-card highlight">
+            <div class="stat-label">☀️ Hottest Time of Day</div>
+            <div class="stat-value">${patterns.hottest_time_of_day.time}</div>
+            <div class="stat-detail">Avg: ${patterns.hottest_time_of_day.average_temp}°C</div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-label">🌙 Coldest Time of Day</div>
+            <div class="stat-value">${patterns.coldest_time_of_day.time}</div>
+            <div class="stat-detail">Avg: ${patterns.coldest_time_of_day.average_temp}°C</div>
+          </div>
+        </div>
+
+        <section class="insights-section">
+          <h2 class="section-title">💡 Key Insights</h2>
+          ${insights.map(insight => `
+            <div class="insight-item">
+              <div class="insight-icon">✨</div>
+              <div class="insight-text">${insight}</div>
+            </div>
+          `).join('')}
+        </section>
+
+        <div class="patterns-grid">
+          <div class="pattern-card">
+            <div class="pattern-title">🔥 Warmest Hours (Averages)</div>
+            <div class="time-list">
+              ${patterns.warmest_hours.map((h, i) => `
+                <div class="time-item">
+                  <span class="time-label">${i + 1}. ${h.time}</span>
+                  <span class="time-temp warm">${h.avg_temp}°C</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div class="pattern-card">
+            <div class="pattern-title">❄️ Coldest Hours (Averages)</div>
+            <div class="time-list">
+              ${patterns.coldest_hours.map((h, i) => `
+                <div class="time-item">
+                  <span class="time-label">${i + 1}. ${h.time}</span>
+                  <span class="time-temp cold">${h.avg_temp}°C</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+
+        <section class="chart-section">
+          <h2 class="section-title">📈 Daily High Temperatures</h2>
+          <div class="chart-container">
+            ${renderChart(daily_breakdown)}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderChart(dailyData) {
+      const maxTemp = Math.max(...dailyData.map(d => d.max || 0));
+      const minTemp = Math.min(...dailyData.map(d => d.max || 0));
+      const range = maxTemp - minTemp || 1;
+      
+      return dailyData.map(day => {
+        const height = ((day.max - minTemp) / range) * 150 + 30;
+        const date = new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        return `
+          <div class="chart-bar" style="height: ${height}px;">
+            <div class="tooltip">
+              <strong>${date}</strong><br>
+              High: ${day.max}°C<br>
+              Low: ${day.min}°C<br>
+              Avg: ${day.average}°C
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  </script>
+</body>
+</html>
+
