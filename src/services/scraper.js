@@ -723,6 +723,7 @@ class WeatherScraper {
       
       // Europe
       'EGLL': 'Europe/London',   // London Heathrow
+      'EGLC': 'Europe/London',   // London City Airport
       'LFPG': 'Europe/Paris',    // Paris CDG
       'EDDF': 'Europe/Berlin',   // Frankfurt
       'EHAM': 'Europe/Amsterdam',// Amsterdam
@@ -731,10 +732,13 @@ class WeatherScraper {
       
       // Americas
       'KJFK': 'America/New_York',    // New York JFK
+      'KLGA': 'America/New_York',    // New York LaGuardia
       'KLAX': 'America/Los_Angeles', // Los Angeles
       'KORD': 'America/Chicago',     // Chicago O'Hare
       'KATL': 'America/New_York',    // Atlanta
-      'CYYZ': 'America/Toronto',     // Toronto
+      'KDAL': 'America/Chicago',     // Dallas Love Field
+      'KSEA': 'America/Los_Angeles', // Seattle-Tacoma
+      'CYYZ': 'America/Toronto',     // Toronto Pearson
       'MMMX': 'America/Mexico_City', // Mexico City
       'SBGR': 'America/Sao_Paulo',   // Sao Paulo
       
