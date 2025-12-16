@@ -14,7 +14,7 @@ const analysisSchema = z.object({
   days: z.string()
     .optional()
     .transform(val => parseInt(val) || 30)
-    .refine(val => val >= 7 && val <= 30, 'Days must be between 7 and 30')
+    .refine(val => val >= 7 && val <= 90, 'Days must be between 7 and 90')
 });
 
 /**
