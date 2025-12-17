@@ -80,7 +80,7 @@ app.get('/health', (req, res) => {
 });
 
 // API documentation endpoint
-app.get('/', (req, res) => {
+app.get('/api/docs', (req, res) => {
   res.json({
     name: 'Wunderground Weather History Scraper API',
     version: '1.0.0',
