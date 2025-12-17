@@ -854,6 +854,46 @@
       font-weight: 600;
       white-space: nowrap;
     }
+
+    /* Persistence Table */
+    .persistence-table {
+      margin-top: 1.5rem;
+    }
+
+    .persistence-table .date-main {
+      display: block;
+      font-weight: 500;
+    }
+
+    .persistence-table .date-day {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .persistence-table .duration-note {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      font-weight: normal;
+    }
+
+    .persistence-table .highlight-row {
+      background: rgba(255, 107, 53, 0.1);
+    }
+
+    .persistence-table .highlight-row td {
+      color: var(--orange);
+    }
+
+    .persistence-table tfoot tr {
+      background: var(--bg-secondary);
+      font-size: 0.9rem;
+    }
+
+    .persistence-table tfoot td {
+      padding: 1rem;
+    }
   </style>
 </head>
 <body>
@@ -1083,9 +1123,26 @@
             </div>
           </div>
           
-          <div class="persistence-chart">
-            ${renderPersistenceChart(patterns.peak_persistence.daily_breakdown)}
-          </div>
+          <table class="data-table persistence-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Peak Temp</th>
+                <th>Total Readings</th>
+                <th>Longest Streak</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${renderPersistenceTable(patterns.peak_persistence.daily_breakdown)}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="2"><strong>Average</strong></td>
+                <td>${patterns.peak_persistence.average_readings_at_peak} readings</td>
+                <td><strong>${patterns.peak_persistence.average_longest_streak} consecutive</strong> (${patterns.peak_persistence.average_duration_estimate})</td>
+              </tr>
+            </tfoot>
+          </table>
         </section>
         ` : ''}
 
@@ -1289,39 +1346,36 @@
       `;
     }
 
-    function renderPersistenceChart(dailyData) {
+    function renderPersistenceTable(dailyData) {
       if (!dailyData || dailyData.length === 0) {
-        return '<div class="no-data">No persistence data available</div>';
+        return '<tr><td colspan="4">No persistence data available</td></tr>';
       }
       
       const maxStreak = Math.max(...dailyData.map(d => d.longest_streak));
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       
-      return `
-        <div class="persistence-bars">
-          ${dailyData.map(day => {
-            const dateObj = new Date(day.date);
-            const dayName = days[dateObj.getDay()];
-            const dateFormatted = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            const barWidth = maxStreak > 0 ? (day.longest_streak / maxStreak) * 100 : 0;
-            const durationMins = day.longest_streak * 30; // Assume 30-min intervals
-            
-            return `
-              <div class="persistence-bar-row">
-                <div class="persistence-date">
-                  <span class="date-main">${dateFormatted}</span>
-                  <span class="date-day">${dayName}</span>
-                </div>
-                <div class="persistence-bar-wrapper">
-                  <div class="persistence-bar" style="width: ${barWidth}%">
-                    <span class="persistence-bar-label">${day.peak_temp}°C held for ${day.longest_streak} readings (~${durationMins}min)</span>
-                  </div>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      `;
+      return dailyData.map(day => {
+        const dateObj = new Date(day.date);
+        const dayName = days[dateObj.getDay()];
+        const dateFormatted = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const durationMins = day.longest_streak * 30; // Assume 30-min intervals
+        const isMax = day.longest_streak === maxStreak;
+        
+        return `
+          <tr class="${isMax ? 'highlight-row' : ''}">
+            <td>
+              <span class="date-main">${dateFormatted}</span>
+              <span class="date-day">${dayName}</span>
+            </td>
+            <td class="temp-high">${day.peak_temp}°C</td>
+            <td>${day.readings_at_peak} readings</td>
+            <td>
+              <strong>${day.longest_streak} consecutive</strong>
+              <span class="duration-note">(~${durationMins} min)${isMax ? ' 🔥' : ''}</span>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
   </script>
 </body>
