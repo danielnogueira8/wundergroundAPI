@@ -1,18 +1,11 @@
-# Use official Node.js image with Puppeteer support
+# Simple Node.js image - no browser needed!
 FROM node:20-slim
 
-# Install Chromium and dependencies
+# Install only essential packages (no chromium)
 RUN apt-get update && apt-get install -y \
-    chromium \
-    fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst fonts-freefont-ttf \
+    ca-certificates \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
-
-# Environment variables for Puppeteer with system Chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-ENV CHROME_PATH=/usr/bin/chromium
-ENV CHROMIUM_FLAGS="--no-sandbox --disable-dev-shm-usage"
 
 # Create app directory
 WORKDIR /app
@@ -20,7 +13,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (puppeteer-core doesn't download Chromium)
+# Install dependencies
 RUN npm ci --only=production
 
 # Copy source code
@@ -29,8 +22,8 @@ COPY src/ ./src/
 # Copy public files (frontend)
 COPY public/ ./public/
 
-# Create logs directory and puppeteer cache directory
-RUN mkdir -p logs .cache/puppeteer
+# Create logs directory
+RUN mkdir -p logs
 
 # Create non-root user for security
 RUN groupadd -r weatherapi && useradd -r -g weatherapi weatherapi
@@ -50,6 +43,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Start the server
 CMD ["node", "src/index.js"]
-
-
-

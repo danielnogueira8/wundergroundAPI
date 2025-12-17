@@ -79,3 +79,4 @@ async function testCurrentTemperature() {
 // Run the test
 testCurrentTemperature();
 
+

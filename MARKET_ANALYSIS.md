@@ -64,3 +64,4 @@ node check_markets.js
 - The script includes delays to respect rate limits
 - Add more cities to the `cities` array if needed
 
+
