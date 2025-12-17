@@ -305,6 +305,41 @@ function analyzeTemperatureData(observations, dailySummaries, location, days) {
     }
   });
   
+  // Calculate peak temperature persistence for each day
+  const peakPersistenceData = [];
+  Object.entries(obsByDate).forEach(([date, dayObs]) => {
+    const persistence = calculatePeakPersistence(dayObs);
+    if (persistence) {
+      peakPersistenceData.push({
+        date,
+        ...persistence
+      });
+    }
+  });
+  
+  // Calculate average persistence stats
+  const avgPeakPersistence = peakPersistenceData.length > 0 
+    ? {
+        average_readings_at_peak: Math.round(
+          peakPersistenceData.reduce((sum, d) => sum + d.total_readings_at_max, 0) / peakPersistenceData.length * 10
+        ) / 10,
+        average_longest_streak: Math.round(
+          peakPersistenceData.reduce((sum, d) => sum + d.longest_streak, 0) / peakPersistenceData.length * 10
+        ) / 10,
+        max_streak_observed: Math.max(...peakPersistenceData.map(d => d.longest_streak)),
+        min_streak_observed: Math.min(...peakPersistenceData.map(d => d.longest_streak)),
+        days_analyzed: peakPersistenceData.length,
+        // Estimate duration: assume 30-min intervals
+        average_duration_estimate: `~${Math.round(peakPersistenceData.reduce((sum, d) => sum + d.longest_streak, 0) / peakPersistenceData.length * 30)} minutes`,
+        daily_breakdown: peakPersistenceData.map(d => ({
+          date: d.date,
+          peak_temp: d.max_temp,
+          readings_at_peak: d.total_readings_at_max,
+          longest_streak: d.longest_streak
+        }))
+      }
+    : null;
+  
   // Calculate median peak time
   const medianPeakTime = calculateMedianTime(peakTimes);
   const medianTroughTime = calculateMedianTime(troughTimes);
@@ -388,7 +423,9 @@ function analyzeTemperatureData(observations, dailySummaries, location, days) {
       coldest_hours: hourlyAverages.slice(-5).reverse().map(h => ({
         time: h.hour,
         avg_temp: h.average
-      }))
+      })),
+      // Peak temperature persistence - how long the high temp stays before dropping
+      peak_persistence: avgPeakPersistence
     },
     daily_breakdown: dailySummaries.map(d => ({
       date: d.date,
@@ -454,6 +491,55 @@ function calculateTemperatureDistribution(temps) {
     .sort((a, b) => a.temperature - b.temperature);
   
   return distribution;
+}
+
+/**
+ * Calculate how long the peak temperature persists before dropping
+ * Returns the number of consecutive readings at the max temp
+ */
+function calculatePeakPersistence(dayObservations) {
+  if (!dayObservations || dayObservations.length === 0) return null;
+  
+  // Sort observations by time
+  const sorted = [...dayObservations].sort((a, b) => {
+    return timeToMinutes(a.time) - timeToMinutes(b.time);
+  });
+  
+  const maxTemp = Math.max(...sorted.map(o => o.temperature_c));
+  
+  // Find all consecutive sequences at max temp
+  let maxSequenceLength = 0;
+  let currentSequence = 0;
+  let sequences = [];
+  
+  for (let i = 0; i < sorted.length; i++) {
+    if (sorted[i].temperature_c === maxTemp) {
+      currentSequence++;
+    } else {
+      if (currentSequence > 0) {
+        sequences.push(currentSequence);
+        maxSequenceLength = Math.max(maxSequenceLength, currentSequence);
+      }
+      currentSequence = 0;
+    }
+  }
+  
+  // Don't forget the last sequence
+  if (currentSequence > 0) {
+    sequences.push(currentSequence);
+    maxSequenceLength = Math.max(maxSequenceLength, currentSequence);
+  }
+  
+  // Total readings at max temp
+  const totalAtMax = sorted.filter(o => o.temperature_c === maxTemp).length;
+  
+  return {
+    max_temp: maxTemp,
+    total_readings_at_max: totalAtMax,
+    longest_streak: maxSequenceLength,
+    num_sequences: sequences.length,
+    sequences: sequences
+  };
 }
 
 /**

@@ -762,6 +762,98 @@
         grid-template-columns: 1fr;
       }
     }
+
+    /* Peak Persistence Section */
+    .persistence-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .persistence-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .persistence-stat {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .persistence-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--orange);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .persistence-label {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 0.5rem;
+    }
+
+    .persistence-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .persistence-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .persistence-date {
+      min-width: 80px;
+      text-align: right;
+    }
+
+    .date-main {
+      display: block;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .date-day {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .persistence-bar-wrapper {
+      flex: 1;
+      height: 32px;
+      background: var(--bg-secondary);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .persistence-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--orange), #ffaa50);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding-left: 12px;
+      min-width: fit-content;
+      transition: width 0.4s ease;
+    }
+
+    .persistence-bar-label {
+      font-size: 0.8rem;
+      color: #1a1a2e;
+      font-weight: 600;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -924,6 +1016,12 @@
             <div class="stat-value">${patterns.coldest_time_of_day.median_time}</div>
             <div class="stat-detail">Most common: ${patterns.coldest_time_of_day.most_common_time} (${patterns.coldest_time_of_day.frequency}/${period.days_with_data} days)</div>
           </div>
+          
+          <div class="stat-card">
+            <div class="stat-label">⏱️ Peak Temp Persistence</div>
+            <div class="stat-value">${patterns.peak_persistence?.average_duration_estimate || 'N/A'}</div>
+            <div class="stat-detail">Avg ${patterns.peak_persistence?.average_longest_streak || 0} consecutive readings at daily high</div>
+          </div>
         </div>
 
         <section class="insights-section">
@@ -960,6 +1058,36 @@
             </div>
           </div>
         </section>
+
+        ${patterns.peak_persistence ? `
+        <section class="persistence-section">
+          <h2 class="section-title">⏱️ Peak Temperature Persistence</h2>
+          <p class="section-subtitle">How long does the daily high temperature hold before dropping?</p>
+          
+          <div class="persistence-stats">
+            <div class="persistence-stat">
+              <div class="persistence-value">${patterns.peak_persistence.average_duration_estimate}</div>
+              <div class="persistence-label">Average Duration</div>
+            </div>
+            <div class="persistence-stat">
+              <div class="persistence-value">${patterns.peak_persistence.average_longest_streak}</div>
+              <div class="persistence-label">Avg Consecutive Readings</div>
+            </div>
+            <div class="persistence-stat">
+              <div class="persistence-value">${patterns.peak_persistence.max_streak_observed}</div>
+              <div class="persistence-label">Max Streak Observed</div>
+            </div>
+            <div class="persistence-stat">
+              <div class="persistence-value">${patterns.peak_persistence.average_readings_at_peak}</div>
+              <div class="persistence-label">Avg Total Readings at Peak</div>
+            </div>
+          </div>
+          
+          <div class="persistence-chart">
+            ${renderPersistenceChart(patterns.peak_persistence.daily_breakdown)}
+          </div>
+        </section>
+        ` : ''}
 
         <div class="patterns-grid">
           <div class="pattern-card">
@@ -1157,6 +1285,41 @@
               </div>
             </div>
           `).join('')}
+        </div>
+      `;
+    }
+
+    function renderPersistenceChart(dailyData) {
+      if (!dailyData || dailyData.length === 0) {
+        return '<div class="no-data">No persistence data available</div>';
+      }
+      
+      const maxStreak = Math.max(...dailyData.map(d => d.longest_streak));
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      
+      return `
+        <div class="persistence-bars">
+          ${dailyData.map(day => {
+            const dateObj = new Date(day.date);
+            const dayName = days[dateObj.getDay()];
+            const dateFormatted = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const barWidth = maxStreak > 0 ? (day.longest_streak / maxStreak) * 100 : 0;
+            const durationMins = day.longest_streak * 30; // Assume 30-min intervals
+            
+            return `
+              <div class="persistence-bar-row">
+                <div class="persistence-date">
+                  <span class="date-main">${dateFormatted}</span>
+                  <span class="date-day">${dayName}</span>
+                </div>
+                <div class="persistence-bar-wrapper">
+                  <div class="persistence-bar" style="width: ${barWidth}%">
+                    <span class="persistence-bar-label">${day.peak_temp}°C held for ${day.longest_streak} readings (~${durationMins}min)</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       `;
     }
