@@ -1,21 +1,35 @@
 # Use official Node.js image with Puppeteer support
 FROM node:20-slim
 
-# Install dependencies required for Puppeteer
+# Install dependencies required for Puppeteer (system libraries only)
 RUN apt-get update && apt-get install -y \
-    chromium \
-    chromium-sandbox \
     fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst fonts-freefont-ttf \
     libxss1 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libnss3 \
+    libnspr4 \
     ca-certificates \
+    wget \
+    gnupg \
     --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/* \
-    && ln -s /usr/bin/chromium /usr/bin/chrome || true
+    && rm -rf /var/lib/apt/lists/*
 
-# Set environment variables for Puppeteer
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-ENV CHROME_BIN=/usr/bin/chromium
+# Environment variables to disable crash reporting (fixes crashpad error)
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
+ENV PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
+ENV CHROME_CRASHPAD_HANDLER_TRAMPOLINE_DISABLE=1
+ENV CHROME_HEADLESS=1
 ENV DISPLAY=:99
 
 # Create app directory
@@ -24,8 +38,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (including Puppeteer which will download Chromium)
+RUN npm ci
 
 # Copy source code
 COPY src/ ./src/
@@ -33,8 +47,8 @@ COPY src/ ./src/
 # Copy public files (frontend)
 COPY public/ ./public/
 
-# Create logs directory
-RUN mkdir -p logs
+# Create logs directory and puppeteer cache directory
+RUN mkdir -p logs .cache/puppeteer
 
 # Create non-root user for security
 RUN groupadd -r weatherapi && useradd -r -g weatherapi weatherapi
