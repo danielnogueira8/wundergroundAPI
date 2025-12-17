@@ -45,6 +45,15 @@ export const weatherHistorySchema = z.object({
 });
 
 /**
+ * Latest weather query parameters schema (no date required)
+ */
+export const latestWeatherSchema = z.object({
+  location: locationSchema,
+  date: dateSchema.optional(), // Optional for backward compatibility
+  metric: metricSchema
+});
+
+/**
  * Date range query parameters schema
  */
 export const dateRangeSchema = z.object({
@@ -122,6 +131,7 @@ export function isValidPrecipitation(precip) {
 export default {
   weatherHistorySchema,
   dateRangeSchema,
+  latestWeatherSchema,
   validateQuery,
   isValidTemperature,
   isValidWindSpeed,

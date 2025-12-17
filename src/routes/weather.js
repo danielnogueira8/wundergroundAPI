@@ -4,7 +4,8 @@ import { cache } from '../services/cache.js';
 import { logger } from '../utils/logger.js';
 import { 
   weatherHistorySchema, 
-  dateRangeSchema, 
+  dateRangeSchema,
+  latestWeatherSchema,
   validateQuery 
 } from '../utils/validators.js';
 
@@ -68,32 +69,43 @@ router.get('/history', validateQuery(weatherHistorySchema), async (req, res, nex
 
 /**
  * GET /api/weather/latest
- * Fetch only the latest data point (most recent hour)
+ * Fetch only the latest/current temperature from the main weather page
  */
-router.get('/latest', validateQuery(weatherHistorySchema), async (req, res, next) => {
-  const { location, metric } = req.validatedQuery;
-  const today = new Date().toISOString().split('T')[0];
+router.get('/latest', validateQuery(latestWeatherSchema), async (req, res, next) => {
+  const { location } = req.validatedQuery;
   const startTime = Date.now();
   
   try {
-    // Check cache with shorter TTL for latest data
-    const cacheKey = cache.generateKey(location, `latest:${today}`);
+    // Check cache with shorter TTL for latest data (15 minutes)
+    const cacheKey = cache.generateKey(location, 'latest');
     let data = cache.get(cacheKey);
     let cacheHit = true;
     
     if (!data) {
       cacheHit = false;
-      logger.info(`Fetching latest weather data for ${location}`);
+      logger.info(`Fetching current temperature for ${location}`);
       
-      // Scrape data
-      const fullData = await scraper.scrapeWeatherData(location, today, metric);
+      // Fetch current temperature from main weather page
+      const temperature = await scraper.fetchCurrentTemperature(location);
       
-      // Extract only the latest/current data
+      // Parse location parts
+      const locationParts = location.split('/');
+      
+      // Build response data
       data = {
-        location: fullData.location,
-        date: fullData.date,
-        timestamp: fullData.timestamp,
-        current: fullData.current
+        location: {
+          city: locationParts[1]?.replace(/-/g, ' ') || '',
+          country: locationParts[0]?.toUpperCase() || '',
+          station: locationParts[2] || '',
+          raw: location
+        },
+        timestamp: new Date().toISOString(),
+        current: {
+          temperature: {
+            celsius: temperature.celsius,
+            fahrenheit: temperature.fahrenheit
+          }
+        }
       };
       
       // Cache for 15 minutes for latest data

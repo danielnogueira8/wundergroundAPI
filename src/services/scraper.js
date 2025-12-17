@@ -59,6 +59,140 @@ class WeatherScraper {
   }
 
   /**
+   * Build the URL for current weather page
+   * @param {string} location - Location in format: country/city/station_code
+   */
+  buildCurrentWeatherUrl(location) {
+    return `https://www.wunderground.com/weather/${location}`;
+  }
+
+  /**
+   * Fetch current temperature from the main weather page
+   * @param {string} location - Location in format: country/city/station_code
+   */
+  async fetchCurrentTemperature(location) {
+    const startTime = Date.now();
+    const url = this.buildCurrentWeatherUrl(location);
+    
+    logger.info(`Fetching current temperature from: ${url}`);
+    
+    await this.init();
+    const page = await this.browser.newPage();
+    
+    try {
+      // Set a realistic user agent
+      await page.setUserAgent(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      );
+
+      // Set extra headers
+      await page.setExtraHTTPHeaders({
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+      });
+
+      // Navigate to the page with retry logic
+      let retries = 3;
+      let lastError;
+      
+      while (retries > 0) {
+        try {
+          await page.goto(url, { 
+            waitUntil: 'domcontentloaded',
+            timeout: 45000 
+          });
+          break;
+        } catch (navError) {
+          lastError = navError;
+          retries--;
+          if (retries > 0) {
+            logger.warn(`Navigation failed, retrying... (${retries} attempts left)`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+      }
+
+      if (retries === 0) {
+        throw new Error(`Failed to navigate to ${url} after 3 attempts: ${lastError.message}`);
+      }
+
+      // Wait for the current-temp element to be available
+      await page.waitForSelector('.current-temp', { timeout: 10000 }).catch(() => {
+        logger.warn('current-temp element not found, trying alternative selectors');
+      });
+
+      // Extract current temperature from the current-temp class
+      const currentTemp = await page.evaluate(() => {
+        // Try to find the current-temp element
+        const tempElement = document.querySelector('.current-temp');
+        if (!tempElement) {
+          return null;
+        }
+
+        // Get the text content and extract the temperature value
+        const text = tempElement.textContent || tempElement.innerText || '';
+        
+        // Try to find the temperature value - it could be in various formats
+        // Look for patterns like "10°C", "10°", "50°F", etc.
+        const tempMatch = text.match(/(-?\d+(?:\.\d+)?)\s*°\s*([CF])?/i);
+        if (tempMatch) {
+          let temp = parseFloat(tempMatch[1]);
+          const unit = tempMatch[2]?.toUpperCase();
+          
+          // If it's in Fahrenheit, convert to Celsius
+          if (unit === 'F') {
+            temp = Math.round((temp - 32) * 5 / 9 * 10) / 10;
+          }
+          
+          return temp;
+        }
+
+        // Alternative: look for nested elements with temperature values
+        const valueElement = tempElement.querySelector('[class*="value"], [class*="temp"]');
+        if (valueElement) {
+          const valueText = valueElement.textContent || valueElement.innerText || '';
+          const valueMatch = valueText.match(/(-?\d+(?:\.\d+)?)/);
+          if (valueMatch) {
+            return parseFloat(valueMatch[1]);
+          }
+        }
+
+        // Last resort: try to parse any number in the element
+        const numberMatch = text.match(/(-?\d+(?:\.\d+)?)/);
+        if (numberMatch) {
+          return parseFloat(numberMatch[1]);
+        }
+
+        return null;
+      });
+
+      if (currentTemp === null || isNaN(currentTemp)) {
+        throw new Error('Could not extract current temperature from current-temp element');
+      }
+
+      const duration = Date.now() - startTime;
+      logger.info(`Current temperature fetched: ${currentTemp}°C in ${duration}ms`, {
+        location,
+        temperature: currentTemp
+      });
+
+      return {
+        celsius: currentTemp,
+        fahrenheit: Math.round((currentTemp * 9/5 + 32) * 10) / 10
+      };
+
+    } catch (error) {
+      logger.error(`Failed to fetch current temperature for ${location}`, {
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    } finally {
+      await page.close();
+    }
+  }
+
+  /**
    * Scrape weather data for a specific location and date
    * @param {string} location - Location string (e.g., 'kr/incheon/RKSI')
    * @param {string} date - Date in YYYY-MM-DD format
