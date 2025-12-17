@@ -79,6 +79,11 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Serve frontend at root path
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
 // API documentation endpoint
 app.get('/api/docs', (req, res) => {
   res.json({
