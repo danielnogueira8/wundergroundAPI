@@ -19,7 +19,11 @@ class WeatherScraper {
    */
   async init() {
     if (!this.browser) {
-      this.browser = await puppeteer.launch({
+      // Determine executable path based on environment
+      const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || 
+                            (process.platform === 'linux' ? '/usr/bin/chromium' : undefined);
+      
+      const launchOptions = {
         headless: 'new',
         args: [
           '--no-sandbox',
@@ -29,11 +33,61 @@ class WeatherScraper {
           '--disable-web-security',
           '--disable-features=IsolateOrigins,site-per-process',
           '--window-size=1920,1080',
-          '--ignore-certificate-errors'
+          '--ignore-certificate-errors',
+          '--disable-extensions',
+          '--disable-background-networking',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-breakpad',
+          '--disable-client-side-phishing-detection',
+          '--disable-default-apps',
+          '--disable-hang-monitor',
+          '--disable-popup-blocking',
+          '--disable-prompt-on-repost',
+          '--disable-sync',
+          '--disable-translate',
+          '--metrics-recording-only',
+          '--no-first-run',
+          '--safebrowsing-disable-auto-update',
+          '--enable-automation',
+          '--password-store=basic',
+          '--use-mock-keychain',
+          '--disable-crash-reporter',
+          '--disable-crashpad' // Explicitly disable crashpad handler
         ],
-        timeout: 60000
-      });
-      logger.info('Browser initialized');
+        timeout: 60000,
+        // Ignore default args that might cause crashpad issues
+        ignoreDefaultArgs: ['--enable-crashpad', '--enable-crash-reporter']
+      };
+
+      // Only set executable path if it's provided or in Docker
+      if (executablePath) {
+        launchOptions.executablePath = executablePath;
+      }
+
+      try {
+        this.browser = await puppeteer.launch(launchOptions);
+        logger.info('Browser initialized', { 
+          executablePath: executablePath || 'default',
+          platform: process.platform 
+        });
+      } catch (error) {
+        logger.error('Failed to launch browser', { 
+          error: error.message,
+          executablePath,
+          platform: process.platform
+        });
+        
+        // Try without explicit executable path as fallback
+        if (executablePath) {
+          logger.info('Retrying without explicit executable path...');
+          delete launchOptions.executablePath;
+          this.browser = await puppeteer.launch(launchOptions);
+          logger.info('Browser initialized with fallback configuration');
+        } else {
+          throw error;
+        }
+      }
     }
     return this.browser;
   }
