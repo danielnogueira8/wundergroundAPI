@@ -1,36 +1,18 @@
 # Use official Node.js image with Puppeteer support
 FROM node:20-slim
 
-# Install dependencies required for Puppeteer (system libraries only)
+# Install Chromium and dependencies
 RUN apt-get update && apt-get install -y \
+    chromium \
     fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst fonts-freefont-ttf \
-    libxss1 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libnss3 \
-    libnspr4 \
-    ca-certificates \
-    wget \
-    gnupg \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Environment variables to disable crash reporting (fixes crashpad error)
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
-ENV PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
-ENV CHROME_CRASHPAD_HANDLER_TRAMPOLINE_DISABLE=1
-ENV CHROME_HEADLESS=1
-ENV DISPLAY=:99
+# Environment variables for Puppeteer with system Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV CHROME_PATH=/usr/bin/chromium
+ENV CHROMIUM_FLAGS="--no-sandbox --disable-dev-shm-usage"
 
 # Create app directory
 WORKDIR /app
@@ -38,8 +20,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (including Puppeteer which will download Chromium)
-RUN npm ci
+# Install dependencies (puppeteer-core doesn't download Chromium)
+RUN npm ci --only=production
 
 # Copy source code
 COPY src/ ./src/

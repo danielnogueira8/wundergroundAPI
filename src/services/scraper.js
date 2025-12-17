@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
 import { logger } from '../utils/logger.js';
 import https from 'https';
 import http from 'http';
@@ -15,15 +15,42 @@ class WeatherScraper {
   }
 
   /**
+   * Get the Chromium executable path
+   */
+  getExecutablePath() {
+    // Check environment variable first
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      return process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+
+    // Common paths for different systems
+    const paths = [
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable',
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    ];
+
+    // For local development on macOS, use Chrome if available
+    if (process.platform === 'darwin') {
+      return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    }
+
+    // Default to chromium for Linux/Docker
+    return '/usr/bin/chromium';
+  }
+
+  /**
    * Initialize the browser instance
    */
   async init() {
     if (!this.browser) {
-      // Use Puppeteer's bundled Chromium unless a custom path is specified
-      const customPath = process.env.PUPPETEER_EXECUTABLE_PATH;
-      
+      const executablePath = this.getExecutablePath();
+
       const launchOptions = {
         headless: 'new',
+        executablePath: executablePath,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -51,32 +78,22 @@ class WeatherScraper {
           '--enable-automation',
           '--password-store=basic',
           '--use-mock-keychain',
-          '--disable-crash-reporter',
-          '--disable-crashpad',
           '--no-zygote',
           '--single-process'
         ],
-        timeout: 60000,
-        // Ignore default args that might cause crashpad issues
-        ignoreDefaultArgs: ['--enable-crashpad', '--enable-crash-reporter']
+        timeout: 60000
       };
-
-      // Only set executable path if explicitly provided
-      if (customPath) {
-        launchOptions.executablePath = customPath;
-        logger.info('Using custom executable path', { executablePath: customPath });
-      }
 
       try {
         this.browser = await puppeteer.launch(launchOptions);
-        logger.info('Browser initialized', { 
-          executablePath: customPath || 'puppeteer-bundled',
-          platform: process.platform 
+        logger.info('Browser initialized', {
+          executablePath: executablePath,
+          platform: process.platform
         });
       } catch (error) {
-        logger.error('Failed to launch browser', { 
+        logger.error('Failed to launch browser', {
           error: error.message,
-          executablePath: customPath || 'puppeteer-bundled',
+          executablePath: executablePath,
           platform: process.platform
         });
         throw error;
@@ -120,12 +137,12 @@ class WeatherScraper {
   async fetchCurrentTemperature(location) {
     const startTime = Date.now();
     const url = this.buildCurrentWeatherUrl(location);
-    
+
     logger.info(`Fetching current temperature from: ${url}`);
-    
+
     await this.init();
     const page = await this.browser.newPage();
-    
+
     try {
       // Set a realistic user agent
       await page.setUserAgent(
@@ -141,12 +158,12 @@ class WeatherScraper {
       // Navigate to the page with retry logic
       let retries = 3;
       let lastError;
-      
+
       while (retries > 0) {
         try {
-          await page.goto(url, { 
+          await page.goto(url, {
             waitUntil: 'domcontentloaded',
-            timeout: 45000 
+            timeout: 45000
           });
           break;
         } catch (navError) {
@@ -178,19 +195,19 @@ class WeatherScraper {
 
         // Get the text content and extract the temperature value
         const text = tempElement.textContent || tempElement.innerText || '';
-        
+
         // Try to find the temperature value - it could be in various formats
         // Look for patterns like "10°C", "10°", "50°F", etc.
         const tempMatch = text.match(/(-?\d+(?:\.\d+)?)\s*°\s*([CF])?/i);
         if (tempMatch) {
           let temp = parseFloat(tempMatch[1]);
           const unit = tempMatch[2]?.toUpperCase();
-          
+
           // If it's in Fahrenheit, convert to Celsius
           if (unit === 'F') {
             temp = Math.round((temp - 32) * 5 / 9 * 10) / 10;
           }
-          
+
           return temp;
         }
 
@@ -225,7 +242,7 @@ class WeatherScraper {
 
       return {
         celsius: currentTemp,
-        fahrenheit: Math.round((currentTemp * 9/5 + 32) * 10) / 10
+        fahrenheit: Math.round((currentTemp * 9 / 5 + 32) * 10) / 10
       };
 
     } catch (error) {
@@ -248,12 +265,12 @@ class WeatherScraper {
   async scrapeWeatherData(location, date, metric = null) {
     const startTime = Date.now();
     const url = this.buildUrl(location, date);
-    
+
     logger.info(`Scraping weather data from: ${url}`);
-    
+
     await this.init();
     const page = await this.browser.newPage();
-    
+
     try {
       // Set a realistic user agent
       await page.setUserAgent(
@@ -269,12 +286,12 @@ class WeatherScraper {
       // Navigate to the page with retry logic
       let retries = 3;
       let lastError;
-      
+
       while (retries > 0) {
         try {
-          await page.goto(url, { 
+          await page.goto(url, {
             waitUntil: 'domcontentloaded',
-            timeout: 45000 
+            timeout: 45000
           });
           break;
         } catch (navError) {
@@ -286,7 +303,7 @@ class WeatherScraper {
           }
         }
       }
-      
+
       if (retries === 0 && lastError) {
         throw lastError;
       }
@@ -322,7 +339,7 @@ class WeatherScraper {
         const scripts = Array.from(document.querySelectorAll('script'));
         for (const script of scripts) {
           const content = script.textContent || '';
-          
+
           // Look for chart data patterns
           if (content.includes('Highcharts') || content.includes('chartData') || content.includes('seriesData')) {
             // Try to extract temperature data
@@ -380,7 +397,7 @@ class WeatherScraper {
             if (cells.length >= 2) {
               const label = cells[0].textContent?.toLowerCase() || '';
               const value = cells[1].textContent?.trim() || '';
-              
+
               if (label.includes('temp') && !label.includes('dew')) {
                 const numVal = parseFloat(value);
                 if (!isNaN(numVal)) {
@@ -413,7 +430,7 @@ class WeatherScraper {
         const summaryElements = document.querySelectorAll('[class*="summary"], [class*="current"], [class*="conditions"]');
         summaryElements.forEach(el => {
           const text = el.textContent || '';
-          
+
           // Temperature pattern: "45°F" or "7°C"
           const tempMatch = text.match(/(-?\d+)\s*°\s*([FC])/i);
           if (tempMatch && !data.temperature.current) {
@@ -449,11 +466,11 @@ class WeatherScraper {
           if (cells.length >= 3) {
             const timeCell = cells[0]?.textContent?.trim();
             const tempCell = cells[1]?.textContent?.trim();
-            
+
             if (timeCell && tempCell) {
               const timeMatch = timeCell.match(/(\d{1,2}):?(\d{2})?\s*(AM|PM)?/i);
               const tempVal = parseFloat(tempCell);
-              
+
               if (timeMatch && !isNaN(tempVal)) {
                 hourlyData.push({
                   time: timeCell,
@@ -463,21 +480,21 @@ class WeatherScraper {
             }
           }
         });
-        
+
         if (hourlyData.length > 0) {
           data.hourlyObservations = hourlyData;
         }
 
         // Calculate min/max/average for temperature
-        const allTemps = data.temperature.hourly.length > 0 
-          ? data.temperature.hourly 
+        const allTemps = data.temperature.hourly.length > 0
+          ? data.temperature.hourly
           : hourlyData.map(h => h.temperature).filter(t => !isNaN(t));
-        
+
         if (allTemps.length > 0) {
           data.temperature.min = Math.min(...allTemps);
           data.temperature.max = Math.max(...allTemps);
           data.temperature.average = Math.round(allTemps.reduce((a, b) => a + b, 0) / allTemps.length * 10) / 10;
-          
+
           if (!data.temperature.current) {
             data.temperature.current = allTemps[allTemps.length - 1];
           }
@@ -525,7 +542,7 @@ class WeatherScraper {
    */
   formatResponse(rawData, location, date, metric) {
     const locationParts = location.split('/');
-    
+
     const response = {
       location: {
         city: this.capitalizeWords(locationParts[1]?.replace(/-/g, ' ') || ''),
@@ -594,7 +611,7 @@ class WeatherScraper {
     // Fallback: construct from separate arrays
     const hourlyData = [];
     const hours = rawData.temperature.hourly?.length || 24;
-    
+
     for (let i = 0; i < hours; i++) {
       const hour = String(i).padStart(2, '0') + ':00';
       hourlyData.push({
@@ -613,7 +630,7 @@ class WeatherScraper {
    */
   filterByMetric(response, metric) {
     if (!metric) return response;
-    
+
     switch (metric.toLowerCase()) {
       case 'temperature':
         return {
@@ -661,7 +678,7 @@ class WeatherScraper {
   // Utility methods
   celsiusToFahrenheit(celsius) {
     if (celsius === null || celsius === undefined) return null;
-    return Math.round((celsius * 9/5 + 32) * 10) / 10;
+    return Math.round((celsius * 9 / 5 + 32) * 10) / 10;
   }
 
   mmToInches(mm) {
@@ -704,7 +721,7 @@ class WeatherScraper {
   async fetchWithHttp(url) {
     return new Promise((resolve, reject) => {
       const protocol = url.startsWith('https') ? https : http;
-      
+
       const options = {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -749,7 +766,7 @@ class WeatherScraper {
     } catch (puppeteerError) {
       logger.warn(`Puppeteer scraping failed: ${puppeteerError.message}`);
     }
-    
+
     // Fallback to HTTP scraping
     try {
       const url = this.buildUrl(location, date);
@@ -769,15 +786,15 @@ class WeatherScraper {
     const locationParts = location.split('/');
     const countryCode = locationParts[0]?.toUpperCase() || '';
     const stationCode = locationParts[2]?.toUpperCase() || '';
-    
+
     // Format date as YYYYMMDD
     const dateFormatted = date.replace(/-/g, '');
-    
+
     // Build API URL: https://api.weather.com/v1/location/{STATION}:9:{COUNTRY}/observations/historical.json
     const apiEndpoint = `${this.apiUrl}/${stationCode}:9:${countryCode}/observations/historical.json?apiKey=${this.apiKey}&startDate=${dateFormatted}&endDate=${dateFormatted}&units=m`;
-    
+
     logger.info(`Fetching from Weather.com API: ${stationCode}:9:${countryCode} for ${date}`);
-    
+
     const response = await this.fetchWithHttp(apiEndpoint);
     return JSON.parse(response);
   }
@@ -790,19 +807,19 @@ class WeatherScraper {
     const countryCode = locationParts[0] || '';
     const stationCode = locationParts[2] || '';
     const observations = apiData.observations || [];
-    
+
     // Get the timezone for this station/country
     const timezone = this.getTimezoneForLocation(countryCode, stationCode);
-    
+
     // Extract all temperatures, wind speeds, etc.
     const temps = observations.map(o => o.temp).filter(t => t !== null && t !== undefined);
     const winds = observations.map(o => o.wspd).filter(w => w !== null && w !== undefined);
     const humidities = observations.map(o => o.rh).filter(h => h !== null && h !== undefined);
     const pressures = observations.map(o => o.pressure).filter(p => p !== null && p !== undefined);
-    
+
     // Get the latest observation
     const latest = observations[observations.length - 1] || {};
-    
+
     return {
       location: {
         city: this.capitalizeWords(locationParts[1]?.replace(/-/g, ' ') || ''),
@@ -871,7 +888,7 @@ class WeatherScraper {
    */
   formatLocalTime(unixTimestamp, timezone = 'UTC') {
     const date = new Date(unixTimestamp * 1000);
-    
+
     // Use Intl.DateTimeFormat to format in the station's local timezone
     const formatter = new Intl.DateTimeFormat('en-US', {
       hour: 'numeric',
@@ -879,7 +896,7 @@ class WeatherScraper {
       hour12: true,
       timeZone: timezone
     });
-    
+
     return formatter.format(date);
   }
 
@@ -901,7 +918,7 @@ class WeatherScraper {
       'VTBS': 'Asia/Bangkok',    // Bangkok
       'VIDP': 'Asia/Kolkata',    // Delhi
       'VABB': 'Asia/Kolkata',    // Mumbai
-      
+
       // Europe
       'EGLL': 'Europe/London',   // London Heathrow
       'EGLC': 'Europe/London',   // London City Airport
@@ -910,7 +927,7 @@ class WeatherScraper {
       'EHAM': 'Europe/Amsterdam',// Amsterdam
       'LEMD': 'Europe/Madrid',   // Madrid
       'LIRF': 'Europe/Rome',     // Rome
-      
+
       // Americas
       'KJFK': 'America/New_York',    // New York JFK
       'KLGA': 'America/New_York',    // New York LaGuardia
@@ -922,18 +939,18 @@ class WeatherScraper {
       'CYYZ': 'America/Toronto',     // Toronto Pearson
       'MMMX': 'America/Mexico_City', // Mexico City
       'SBGR': 'America/Sao_Paulo',   // Sao Paulo
-      
+
       // Oceania
       'YSSY': 'Australia/Sydney',    // Sydney
       'YMML': 'Australia/Melbourne', // Melbourne
       'NZAA': 'Pacific/Auckland'     // Auckland
     };
-    
+
     // Check station-specific timezone first
     if (stationTimezones[stationCode]) {
       return stationTimezones[stationCode];
     }
-    
+
     // Fallback to country-based timezone
     const countryTimezones = {
       'kr': 'Asia/Seoul',
@@ -958,7 +975,7 @@ class WeatherScraper {
       'au': 'Australia/Sydney',
       'nz': 'Pacific/Auckland'
     };
-    
+
     return countryTimezones[countryCode.toLowerCase()] || 'UTC';
   }
 
@@ -980,20 +997,20 @@ class WeatherScraper {
     // Parse the Daily Observations table
     // Look for table rows with observation data
     // Pattern: Time | Temperature | Dew Point | Humidity | Wind | Wind Speed | Wind Gust | Pressure | Precip. | Condition
-    
+
     // Find all table rows that contain observation data
     // The table structure has rows with time like "12:00 AM", "12:30 AM", etc.
     const rowPattern = /<tr[^>]*>[\s\S]*?<\/tr>/gi;
     const rows = html.match(rowPattern) || [];
-    
+
     const observations = [];
-    
+
     for (const row of rows) {
       // Extract cell data - look for td elements
       const cellPattern = /<td[^>]*>([\s\S]*?)<\/td>/gi;
       const cells = [];
       let cellMatch;
-      
+
       while ((cellMatch = cellPattern.exec(row)) !== null) {
         // Clean up the cell content
         let content = cellMatch[1]
@@ -1003,11 +1020,11 @@ class WeatherScraper {
           .trim();
         cells.push(content);
       }
-      
+
       // Check if this looks like an observation row (has time pattern)
       if (cells.length >= 8) {
         const timeMatch = cells[0]?.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-        
+
         if (timeMatch) {
           const observation = {
             time: cells[0].trim(),
@@ -1021,21 +1038,21 @@ class WeatherScraper {
             precipitation_mm: this.parsePrecipitation(cells[8]),
             condition: cells[9]?.trim() || null
           };
-          
+
           observations.push(observation);
         }
       }
     }
-    
+
     // If we found observations, process them
     if (observations.length > 0) {
       data.hourlyObservations = observations;
-      
+
       // Extract temperature data
       const temps = observations
         .map(o => o.temperature_c)
         .filter(t => t !== null && !isNaN(t));
-      
+
       if (temps.length > 0) {
         data.temperature.hourly = temps;
         data.temperature.current = temps[temps.length - 1]; // Most recent
@@ -1043,48 +1060,48 @@ class WeatherScraper {
         data.temperature.max = Math.max(...temps);
         data.temperature.average = Math.round(temps.reduce((a, b) => a + b, 0) / temps.length * 10) / 10;
       }
-      
+
       // Extract wind data
       const winds = observations
         .map(o => o.wind_speed_kmh)
         .filter(w => w !== null && !isNaN(w));
-      
+
       if (winds.length > 0) {
         data.wind.hourly = winds;
         data.wind.current = winds[winds.length - 1];
       }
-      
+
       // Extract humidity data
       const humidities = observations
         .map(o => o.humidity)
         .filter(h => h !== null && !isNaN(h));
-      
+
       if (humidities.length > 0) {
         data.humidity.hourly = humidities;
         data.humidity.current = humidities[humidities.length - 1];
       }
-      
+
       // Extract precipitation data
       const precips = observations
         .map(o => o.precipitation_mm)
         .filter(p => p !== null && !isNaN(p));
-      
+
       if (precips.length > 0) {
         data.precipitation.hourly = precips;
         data.precipitation.total = precips.reduce((a, b) => a + b, 0);
       }
-      
+
       // Extract pressure data
       const pressures = observations
         .map(o => o.pressure_hpa)
         .filter(p => p !== null && !isNaN(p));
-      
+
       if (pressures.length > 0) {
         data.pressure.hourly = pressures;
         data.pressure.current = pressures[pressures.length - 1];
       }
     }
-    
+
     // Fallback: try simple pattern matching if table parsing didn't work
     if (observations.length === 0) {
       // Try to extract temperature from the page
@@ -1101,7 +1118,7 @@ class WeatherScraper {
           }
           return null;
         }).filter(t => t !== null && t > -50 && t < 60);
-        
+
         if (temps.length > 0) {
           data.temperature.current = temps[0];
           data.temperature.min = Math.min(...temps);
