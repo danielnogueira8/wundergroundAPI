@@ -970,6 +970,25 @@
       });
     });
 
+    // Helper function to convert Celsius to Fahrenheit
+    function celsiusToFahrenheit(c) {
+      if (c === null || c === undefined || isNaN(c)) return null;
+      return Math.round((c * 9/5 + 32) * 10) / 10;
+    }
+
+    // Helper function to format temperature with both C and F
+    function formatTemp(c) {
+      if (c === null || c === undefined || isNaN(c)) return 'N/A';
+      const f = celsiusToFahrenheit(c);
+      return `${c}°C (${f}°F)`;
+    }
+
+    // Helper function to format temperature range
+    function formatTempRange(min, max) {
+      if (min === null || max === null) return 'N/A';
+      return `${min}°C (${celsiusToFahrenheit(min)}°F) to ${max}°C (${celsiusToFahrenheit(max)}°F)`;
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       
@@ -1022,24 +1041,24 @@
         <div class="stats-grid">
           <div class="stat-card highlight">
             <div class="stat-label">📊 Median Daily High</div>
-            <div class="stat-value warm">${temperature.daily_highs.median}<span class="stat-unit">°C</span></div>
-            <div class="stat-detail">Range: ${temperature.daily_highs.min}°C to ${temperature.daily_highs.max}°C</div>
+            <div class="stat-value warm">${formatTemp(temperature.daily_highs.median)}</div>
+            <div class="stat-detail">Range: ${formatTempRange(temperature.daily_highs.min, temperature.daily_highs.max)}</div>
           </div>
           
           <div class="stat-card">
             <div class="stat-label">🌡️ Overall Average</div>
-            <div class="stat-value">${temperature.overall_average}<span class="stat-unit">°C</span></div>
+            <div class="stat-value">${formatTemp(temperature.overall_average)}</div>
             <div class="stat-detail">${period.total_observations} observations</div>
           </div>
           
           <div class="stat-card">
             <div class="stat-label">🔥 Absolute Maximum</div>
-            <div class="stat-value warm">${temperature.absolute_max}<span class="stat-unit">°C</span></div>
+            <div class="stat-value warm">${formatTemp(temperature.absolute_max)}</div>
           </div>
           
           <div class="stat-card">
             <div class="stat-label">❄️ Absolute Minimum</div>
-            <div class="stat-value cold">${temperature.absolute_min}<span class="stat-unit">°C</span></div>
+            <div class="stat-value cold">${formatTemp(temperature.absolute_min)}</div>
           </div>
           
           <div class="stat-card highlight">
@@ -1124,7 +1143,7 @@
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Peak Temp</th>
+                <th>Peak Temp (°C / °F)</th>
                 <th>Total Readings</th>
                 <th>Longest Streak</th>
               </tr>
@@ -1150,7 +1169,7 @@
               ${patterns.warmest_hours.map((h, i) => `
                 <div class="time-item">
                   <span class="time-label">${i + 1}. ${h.time}</span>
-                  <span class="time-temp warm">${h.avg_temp}°C</span>
+                  <span class="time-temp warm">${formatTemp(h.avg_temp)}</span>
                 </div>
               `).join('')}
             </div>
@@ -1162,7 +1181,7 @@
               ${patterns.coldest_hours.map((h, i) => `
                 <div class="time-item">
                   <span class="time-label">${i + 1}. ${h.time}</span>
-                  <span class="time-temp cold">${h.avg_temp}°C</span>
+                  <span class="time-temp cold">${formatTemp(h.avg_temp)}</span>
                 </div>
               `).join('')}
             </div>
@@ -1182,7 +1201,7 @@
           <table class="data-table distribution-table">
             <thead>
               <tr>
-                <th>Temperature</th>
+                <th>Temperature (°C / °F)</th>
                 <th>Days Recorded</th>
                 <th>Frequency</th>
                 <th>Distribution</th>
@@ -1195,7 +1214,7 @@
           <div class="table-summary">
             <div class="summary-item">
               <span class="summary-label">Median High:</span>
-              <span class="summary-value temp-high">${temperature.daily_highs.median}°C</span>
+              <span class="summary-value temp-high">${formatTemp(temperature.daily_highs.median)}</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">Most Common:</span>
@@ -1211,11 +1230,11 @@
               <tr>
                 <th>Date</th>
                 <th>Day</th>
-                <th>High (°C)</th>
+                <th>High (°C / °F)</th>
                 <th>Time</th>
-                <th>Low (°C)</th>
+                <th>Low (°C / °F)</th>
                 <th>Time</th>
-                <th>Average (°C)</th>
+                <th>Average (°C / °F)</th>
                 <th>Range</th>
               </tr>
             </thead>
@@ -1226,19 +1245,19 @@
           <div class="table-summary">
             <div class="summary-item">
               <span class="summary-label">Median High:</span>
-              <span class="summary-value temp-high">${temperature.daily_highs.median}°C</span>
+              <span class="summary-value temp-high">${formatTemp(temperature.daily_highs.median)}</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">Average High:</span>
-              <span class="summary-value">${temperature.daily_highs.average}°C</span>
+              <span class="summary-value">${formatTemp(temperature.daily_highs.average)}</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">Highest:</span>
-              <span class="summary-value temp-high">${temperature.daily_highs.max}°C</span>
+              <span class="summary-value temp-high">${formatTemp(temperature.daily_highs.max)}</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">Lowest High:</span>
-              <span class="summary-value temp-low">${temperature.daily_highs.min}°C</span>
+              <span class="summary-value temp-low">${formatTemp(temperature.daily_highs.min)}</span>
             </div>
           </div>
         </section>
@@ -1258,9 +1277,9 @@
           <div class="chart-bar" style="height: ${height}px;">
             <div class="tooltip">
               <strong>${date}</strong><br>
-              High: ${day.max}°C<br>
-              Low: ${day.min}°C<br>
-              Avg: ${day.average}°C
+              High: ${formatTemp(day.max)}<br>
+              Low: ${formatTemp(day.min)}<br>
+              Avg: ${formatTemp(day.average)}
             </div>
           </div>
         `;
@@ -1281,12 +1300,12 @@
           <tr class="${isMedian ? 'median-row' : ''}">
             <td class="date-cell">${dateFormatted}</td>
             <td>${dayName}</td>
-            <td class="temp-high">${day.max}°C ${isMedian ? '← Median' : ''}</td>
+            <td class="temp-high">${formatTemp(day.max)} ${isMedian ? '← Median' : ''}</td>
             <td class="time-cell">${day.max_time || '-'}</td>
-            <td class="temp-low">${day.min}°C</td>
+            <td class="temp-low">${formatTemp(day.min)}</td>
             <td class="time-cell">${day.min_time || '-'}</td>
-            <td class="temp-avg">${day.average}°C</td>
-            <td>${range}°C</td>
+            <td class="temp-avg">${formatTemp(day.average)}</td>
+            <td>${formatTemp(range)}</td>
           </tr>
         `;
       }).join('');
@@ -1302,7 +1321,7 @@
         
         return `
           <tr class="${item.is_median ? 'median-row' : ''}">
-            <td class="temp-high">${item.temperature}°C ${item.is_median ? '← Median' : ''}</td>
+            <td class="temp-high">${formatTemp(item.temperature)} ${item.is_median ? '← Median' : ''}</td>
             <td>${item.count} ${item.count === 1 ? 'day' : 'days'}</td>
             <td>${item.percentage}%</td>
             <td>
@@ -1318,7 +1337,7 @@
     function getMostCommonTemp(distribution) {
       if (!distribution || distribution.length === 0) return 'N/A';
       const mostCommon = distribution.reduce((max, item) => item.count > max.count ? item : max);
-      return `${mostCommon.temperature}°C (${mostCommon.count} days)`;
+      return `${formatTemp(mostCommon.temperature)} (${mostCommon.count} days)`;
     }
 
     function renderTimeDistribution(distribution, type) {
@@ -1364,7 +1383,7 @@
               <span class="date-main">${dateFormatted}</span>
               <span class="date-day">${dayName}</span>
             </td>
-            <td class="temp-high">${day.peak_temp}°C</td>
+            <td class="temp-high">${formatTemp(day.peak_temp)}</td>
             <td>${day.readings_at_peak} readings</td>
             <td>
               <strong>${day.longest_streak} consecutive</strong>
